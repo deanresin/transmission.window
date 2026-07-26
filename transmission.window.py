@@ -129,7 +129,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 
 		if not torrents:
 			color = curses.color_pair(3) if alt_active else curses.color_pair(4)
-			stdscr.addstr(4, 2, "no torrents", color)
+			stdscr.addstr(4, 2, "no torrents", color | curses.A_BOLD)
 			
 		else:
 			# measure column widths
