@@ -212,7 +212,7 @@ def main():
 	snapshot = False
 	if len(sys.argv) > 2 and sys.argv[2] == "1":
 		snapshot = True
-
+	
 	try:
 		curses.wrapper(lambda stdscr: draw_screen(stdscr, sys.argv[1], snapshot_mode=snapshot))
 	except KeyboardInterrupt:
