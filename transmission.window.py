@@ -7,12 +7,12 @@ import subprocess
 import sys
 import time
 
-def get_transmission_data():
+def get_transmission_data(hostport):
 
 	try:
 		# get session info to check alternate speed limit status
 		session = subprocess.check_output(
-			["transmission-remote", "--authenv", "--session-info"],
+			["transmission-remote", hostport, "--authenv", "--session-info"],
 			text=True,
 			stderr=subprocess.DEVNULL,
 		)
@@ -21,7 +21,7 @@ def get_transmission_data():
 		
 		# get torrent info
 		info = subprocess.check_output(
-			["transmission-remote", "--authenv", "-t", "all", "--info"],
+			["transmission-remote", hostport, "--authenv", "-t", "all", "--info"],
 			text=True,
 			stderr=subprocess.DEVNULL,
 		)
@@ -75,7 +75,7 @@ def get_transmission_data():
 	return torrents, alt_active
 
 
-def draw_screen(stdscr, snapshot_mode=False):
+def draw_screen(stdscr, hostport, snapshot_mode=False):
 	# initialize color pairs
 	curses.start_color()
 	curses.use_default_colors()
@@ -107,7 +107,7 @@ def draw_screen(stdscr, snapshot_mode=False):
 
 	while True:
 	
-		torrents, alt_active = get_transmission_data()
+		torrents, alt_active = get_transmission_data(hostport)
 
 		if torrents is None:
 			return 1
@@ -210,11 +210,11 @@ def draw_screen(stdscr, snapshot_mode=False):
 
 def main():
 	snapshot = False
-	if len(sys.argv) > 1 and sys.argv[1] == "1":
+	if len(sys.argv) > 2 and sys.argv[2] == "1":
 		snapshot = True
 
 	try:
-		curses.wrapper(lambda stdscr: draw_screen(stdscr, snapshot_mode=snapshot))
+		curses.wrapper(lambda stdscr: draw_screen(stdscr, sys.argv[1], snapshot_mode=snapshot))
 	except KeyboardInterrupt:
 		sys.exit(0)
 
