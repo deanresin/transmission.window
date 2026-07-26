@@ -117,7 +117,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 
 		# header strings
 		now_str = " - " + datetime.datetime.now().strftime("%H:%M %a, %b %d, %Y")
-		header = f" ~~~ TRANSMISSION-REMOTE ~~~ "
+		header = f" ~~~ TRANSMISSION-WINDOW ~~~ "
 
 		# draw header bar
 		stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
