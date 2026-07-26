@@ -59,7 +59,7 @@ def get_transmission_data():
 			size = sizes_raw[i].replace(" ", "") 
 
 		# speed string with unicode arrow ⇂
-		speed = dspeeds_raw[i].replace(" ", "") + " \u21c2"
+		speed = dspeeds_raw[i].replace(" ", "") + "\u21c2"
 
 		torrents.append(
 			{
@@ -116,7 +116,7 @@ def draw_screen(stdscr, snapshot_mode=False):
 		max_y, max_x = stdscr.getmaxyx()
 
 		# header strings
-		now_str = " - " + datetime.datetime.now().strftime("%H:%M:%S %a, %b %d, %Y")
+		now_str = " - " + datetime.datetime.now().strftime("%H:%M %a, %b %d, %Y")
 		header = f" ~~~ TRANSMISSION-REMOTE ~~~ "
 
 		# draw header bar
@@ -136,7 +136,7 @@ def draw_screen(stdscr, snapshot_mode=False):
 			id_width = max(len(t["id"]) for t in torrents)
 			prog_width = max(len(str(t["progress"])) for t in torrents)
 			size_width = max(len(t["size"]) for t in torrents)
-			speed_width = 12
+			speed_width = 11
 
 			# calculate remaining space for flexible progress/name bar
 			# 8 extra spaces accounts for padding, brackets, and state column
@@ -179,10 +179,10 @@ def draw_screen(stdscr, snapshot_mode=False):
 				stdscr.addstr(row, 5 + id_width + prog_width + size_width + pb_len, unfilled_name, curses.color_pair(3) | curses.A_BOLD,)
 
 				# render right bracket
-				stdscr.addstr(row, 5 + id_width + prog_width + size_width + flex, "|",)
+				stdscr.addstr(row, 6 + id_width + prog_width + size_width + flex, "|",)
 
 				# render download speed
-				stdscr.addstr(row, 6 + id_width + prog_width + size_width + flex, f"{t['speed']:>{speed_width}}", curses.color_pair(3),)
+				stdscr.addstr(row, 7 + id_width + prog_width + size_width + flex, f"{t['speed']:>{speed_width}}", curses.color_pair(3),)
 
 				# render download state
 				stdscr.addstr(row, 8 + id_width + prog_width + size_width + flex + speed_width, f"{t['state']}", alt_color,)		
