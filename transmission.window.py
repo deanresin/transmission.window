@@ -192,8 +192,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 			stdscr.addstr(
 				4 + len(torrents) + (2 if not len(torrents) else 1), 
 				1, 
-				"press 'q' or ctrl-c to quit", 
-				curses.color_pair(3) if alt_active else curses.color_pair(4)
+				"press 'q' or ctrl-c to quit",
 			)
 			
 		stdscr.refresh()
