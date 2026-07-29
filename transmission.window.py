@@ -163,7 +163,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 			
 		# there will be no data on first iteration	
 		if torrents is None:
-			return 1
+			continue
 		
 		stdscr.clear()
 		max_y, max_x = stdscr.getmaxyx()
