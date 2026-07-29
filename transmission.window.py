@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# provides a terminal gui window into the current state of transmission-daemon
+# heading timestamp will be green if port is open (checked every Y seconds)
+# transmission-daemon state updated every X seconds
+# does not show upload speed
+
 import curses
 import datetime
 import re
