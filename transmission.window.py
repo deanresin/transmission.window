@@ -135,7 +135,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	last_transmission_time = 0
 	last_port_time = 0
 	
-	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every X.0 seconds
+	TRANSMISSION_INTERVAL = 1.0  # refresh transmission data every X.0 seconds
 	PORT_INTERVAL = 15.0	# refresh port status every Y.0 seconds
 	
 	update = False
