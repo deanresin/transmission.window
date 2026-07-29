@@ -123,9 +123,6 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	
 	stdscr.timeout(50)
 	
-	# preserve state for ui rendering
-	torrents, alt_active = [], False
-	
 	# executor with max_workers=1 ensures only one check runs at a time
 	executor = ThreadPoolExecutor(max_workers=1)
 	port_future = None
@@ -135,7 +132,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	last_transmission_time = 0
 	last_port_time = 0
 	
-	TRANSMISSION_INTERVAL = 1.0  # refresh transmission data every X.0 seconds
+	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every X.0 seconds
 	PORT_INTERVAL = 15.0	# refresh port status every Y.0 seconds
 	
 	update = False
@@ -267,13 +264,6 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		stdscr.refresh()
 
 		if snapshot_mode:
-			break
-   
-		# check for user quit keys ('q' or Ctrl+C) with 2-second timeout
-		stdscr.timeout(2000)
-		ch = stdscr.getch()
-		if ch in (ord("q"), ord("Q"), 3):  # 3 is ASCII for Ctrl+C
-			executor.shutdown(wait=False, cancel_futures=True)
 			break
 
 
