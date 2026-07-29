@@ -162,7 +162,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 			transmission_future = executor.submit(get_transmission_data, hostport)
 			
 		# there will be no data on first iteration	
-		if torrents is None:
+		if not torrents:
 			continue
 		
 		stdscr.clear()
