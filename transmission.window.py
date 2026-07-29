@@ -135,6 +135,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every X.0 seconds
 	PORT_INTERVAL = 15.0	# refresh port status every Y.0 seconds
 	
+	# redraw screen?
 	update = False
     
 	while True:
@@ -161,10 +162,19 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		# only get transmission update if previous update finished
 		if transmission_future is None and (current_time - last_transmission_time >= TRANSMISSION_INTERVAL):
 			transmission_future = executor.submit(get_transmission_data, hostport)
+		
+		# check if there is a port status update 
+		if port_future is not None and port_future.done():
+			port_is_open = port_future.result()
+			port_future = None  # clear the future so a new check can spawn
+			last_port_time = current_time
+		# only check port if previous update finished
+		if port_future is None and (current_time - last_port_time >= PORT_INTERVAL):
+			port_future = executor.submit(get_port_status, hostport)
 			
-		# there will be no data on first iteration	
+		# no data, no draw
 		if not update:
-			continue
+			continue # skips current loop iteration
 		
 		update = False
 		
@@ -181,17 +191,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		stdscr.addstr(2, 1, header)
 		stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
     
-    # check if there is a port status update 
-		if port_future is not None and port_future.done():
-			port_is_open = port_future.result()
-			port_future = None  # clear the future so a new check can spawn
-			last_port_time = current_time
-		# only check port if previous update finished
-		if port_future is None and (current_time - last_port_time >= PORT_INTERVAL):
-			port_future = executor.submit(get_port_status, hostport)			
-		
 		stdscr.addstr(2, 30, now_str, curses.color_pair(8) if port_is_open else curses.color_pair(2))
-		#stdscr.addstr(2, 30, now_str)
 		
 		if not torrents:
 			color = curses.color_pair(3) if alt_active else curses.color_pair(4)
