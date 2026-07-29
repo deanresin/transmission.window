@@ -137,6 +137,8 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	
 	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every X.0 seconds
 	PORT_INTERVAL = 15.0	# refresh port status every Y.0 seconds
+	
+	update = False
     
 	while True:
 	
@@ -155,15 +157,19 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 				executor.shutdown(wait=False, cancel_futures=True)
 				return 1
 			
+			update = True
 			transmission_future = None  # clear the future so a new check can spawn
 			last_transmission_time = current_time
+			
 		# only get transmission update if previous update finished
 		if transmission_future is None and (current_time - last_transmission_time >= TRANSMISSION_INTERVAL):
 			transmission_future = executor.submit(get_transmission_data, hostport)
 			
 		# there will be no data on first iteration	
-		if not torrents:
+		if not update:
 			continue
+		
+		update = False
 		
 		stdscr.clear()
 		max_y, max_x = stdscr.getmaxyx()
