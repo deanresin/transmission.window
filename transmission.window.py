@@ -88,8 +88,7 @@ def get_port_status(hostport):
 		port_open = "Port is open: Yes" in port_status
 	except (subprocess.CalledProcessError, FileNotFoundError):
 		pass
-	# prevent transmission from continually testing the port w/out breaks
-	time.sleep(15)
+
 	return port_open
 
 
@@ -121,21 +120,46 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		curses.curs_set(0)
 	except curses.error:
 		pass
-
-	# non blocking input handling
-	stdscr.nodelay(not snapshot_mode)
+	
+	stdscr.timeout(50)
+	
+	# preserve state for ui rendering
+	torrents, alt_active = [], False
 	
 	# executor with max_workers=1 ensures only one check runs at a time
 	executor = ThreadPoolExecutor(max_workers=1)
 	port_future = None
 	port_is_open = False  # stores the latest check result
+	transmission_future = None
 
+	last_transmission_time = 0
+	last_port_time = 0
+	
+	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every X.0 seconds
+	PORT_INTERVAL = 15.0	# refresh port status every Y.0 seconds
+    
 	while True:
 	
-		torrents, alt_active = get_transmission_data(hostport)
+		current_time = time.time()
 
-		if torrents is None:
-			return 1
+		# input check
+		ch = stdscr.getch()
+		if ch in (ord("q"), ord("Q"), 3):
+			executor.shutdown(wait=False, cancel_futures=True)
+			break
+			
+		# check if there is a transmission update 
+		if transmission_future is not None and transmission_future.done():
+			torrents, alt_active = transmission_future.result()
+			if torrents is None:
+				executor.shutdown(wait=False, cancel_futures=True)
+				return 1
+			
+			transmission_future = None  # clear the future so a new check can spawn
+			last_transmission_time = current_time
+		# only get transmission update if previous update finished
+		if transmission_future is None and (current_time - last_transmission_time >= TRANSMISSION_INTERVAL):
+			transmission_future = executor.submit(get_transmission_data, hostport)		
 		
 		stdscr.clear()
 		max_y, max_x = stdscr.getmaxyx()
@@ -154,8 +178,9 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		if port_future is not None and port_future.done():
 			port_is_open = port_future.result()
 			port_future = None  # clear the future so a new check can spawn
+			last_port_time = current_time
 		# only check port if previous update finished
-		if port_future is None:
+		if port_future is None and (current_time - last_port_time >= PORT_INTERVAL):
 			port_future = executor.submit(get_port_status, hostport)			
 		
 		stdscr.addstr(2, 30, now_str, curses.color_pair(8) if port_is_open else curses.color_pair(2))
@@ -238,6 +263,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		stdscr.timeout(2000)
 		ch = stdscr.getch()
 		if ch in (ord("q"), ord("Q"), 3):  # 3 is ASCII for Ctrl+C
+			executor.shutdown(wait=False, cancel_futures=True)
 			break
 
 
