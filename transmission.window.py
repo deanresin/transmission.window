@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 def get_transmission_data(hostport):
 
@@ -27,7 +28,7 @@ def get_transmission_data(hostport):
 		)
 	except (subprocess.CalledProcessError, FileNotFoundError):
 		return None, False
-		
+	
 	# parsing info
 	# get ids
 	ids = re.findall(r"^\s*Id:\s*(\d+)", info, re.MULTILINE)
@@ -50,8 +51,8 @@ def get_transmission_data(hostport):
 		except (IndexError, ValueError):
 			progress = 0
   		
-		#st = states_raw[i] if i < len(states_raw) else "Stopped"
-		state = "S" if any(s in states_raw[i] for s in ("Idle", "Seeding")) else ("D" if "Down" in states_raw[i] else "P")
+		# S when Idle with zero downloaded makes no sense
+		state = "I" if "Idle" in states_raw[i] else "S" if "Seeding" in states_raw[i] else ("D" if "Down" in states_raw[i] else "P")
 
 		if "None" in sizes_raw[i]:
 			size = "n/a"
@@ -74,6 +75,23 @@ def get_transmission_data(hostport):
 
 	return torrents, alt_active
 
+def get_port_status(hostport):
+	port_open = False
+	try:
+		# test if port is open
+		port_status = subprocess.check_output(
+			["transmission-remote", hostport, "--authenv", "-pt"],
+			text=True,
+			stderr=subprocess.DEVNULL,
+		)
+		# True if alternate speed limits are active
+		port_open = "Port is open: Yes" in port_status
+	except (subprocess.CalledProcessError, FileNotFoundError):
+		pass
+	# prevent transmission from continually testing the port w/out breaks
+	time.sleep(15)
+	return port_open
+
 
 def draw_screen(stdscr, hostport, snapshot_mode=False):
 	# initialize color pairs
@@ -81,20 +99,22 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	curses.use_default_colors()
 
 	# color definitions
-	# 1: header (White text on Blue background)
+	# 1: header (white text on blue background)
 	curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-	# 2: ids & dividers (Dark Gray / Bright Black)
+	# 2: ids & dividers (dark gray / bright black)
 	curses.init_pair(2, curses.COLOR_WHITE, -1)
-	# 3: percent / speed / Size (Yellow)
+	# 3: percent / speed / size (yellow)
 	curses.init_pair(3, curses.COLOR_YELLOW, -1)
-	# 4: alt speed active (Blue)
+	# 4: alt speed active (blue)
 	curses.init_pair(4, curses.COLOR_BLUE, -1)
-	# 5: alt speed inactive (Dark Yellow)
+	# 5: alt speed inactive (dark yellow)
 	curses.init_pair(5, curses.COLOR_YELLOW, -1)
-	# 6: in-progress bar (Yellow text on Blue background)
+	# 6: in-progress bar (yellow text on blue background)
 	curses.init_pair(6, curses.COLOR_YELLOW, curses.COLOR_BLUE)
-	# 7: finished 100% bar (White text on Green background)
+	# 7: finished 100% bar (white text on green background)
 	curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_GREEN)
+	# 8: port open status
+	curses.init_pair(8, curses.COLOR_GREEN, -1)
 
 	# hide cursor
 	try:
@@ -104,6 +124,11 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 
 	# non blocking input handling
 	stdscr.nodelay(not snapshot_mode)
+	
+	# executor with max_workers=1 ensures only one check runs at a time
+	executor = ThreadPoolExecutor(max_workers=1)
+	port_future = None
+	port_is_open = False  # stores the latest check result
 
 	while True:
 	
@@ -124,9 +149,18 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		stdscr.addstr(1, 1, "                             ")
 		stdscr.addstr(2, 1, header)
 		stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-      
-		stdscr.addstr(2, 30, now_str)
-
+    
+    # check if there is a port status update 
+		if port_future is not None and port_future.done():
+			port_is_open = port_future.result()
+			port_future = None  # clear the future so a new check can spawn
+		# only check port if previous update finished
+		if port_future is None:
+			port_future = executor.submit(get_port_status, hostport)			
+		
+		stdscr.addstr(2, 30, now_str, curses.color_pair(8) if port_is_open else curses.color_pair(2))
+		#stdscr.addstr(2, 30, now_str)
+		
 		if not torrents:
 			color = curses.color_pair(3) if alt_active else curses.color_pair(4)
 			stdscr.addstr(4, 2, "no torrents", color | curses.A_BOLD)
