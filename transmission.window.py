@@ -126,19 +126,21 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	except curses.error:
 		pass
 	
+	# checks for key interrupt every <X>ms
 	stdscr.timeout(50)
 	
 	# executor with max_workers=1 ensures only one check runs at a time
 	executor = ThreadPoolExecutor(max_workers=1)
 	port_future = None
-	port_is_open = False  # stores the latest check result
 	transmission_future = None
 
+	port_is_open = False  # stores the latest check result
+	
 	last_transmission_time = 0
 	last_port_time = 0
 	
-	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every X.0 seconds
-	PORT_INTERVAL = 60.0	# refresh port status every Y.0 seconds
+	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every <X> seconds
+	PORT_INTERVAL = 60.0	# refresh port status every <X> seconds
 	
 	# redraw screen?
 	update = False
