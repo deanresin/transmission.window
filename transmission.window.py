@@ -49,58 +49,70 @@ class Transmission_RPC_Client:
 		return response.json()
 
 def format_size(size):
-	if size > 10000000000:
-		size_string = f'{size / 1000000000:.1f}GB'
-	elif size > 1000000000:
-		size_string = f'{size / 1000000000:.2f}GB'
-	elif size > 10000000:
-		size_string = f'{size / 1000000:.1f}MB'
-	elif size > 1000000:
-		size_string = f'{size / 1000000:.2f}MB'
-	elif size > 10000:
-		size_string = f'{size / 1000:.1f}KB'
-	elif size > 1000:
-		size_string = f'{size / 1000:.2f}KB'
-	elif size == 0:
-		size_string = 'n/a'
+	if size == 0:
+		return 'n/a'
+
+	# define binary powers
+	KB = 1024
+	MB = KB * 1024
+	GB = MB * 1024
+	TB = GB * 1024
+
+	if size >= TB:
+		prec = 1 if (size / TB) >= 10 else 2
+		return f"{size / TB:.{prec}f}TB"
+	elif size >= GB:
+		prec = 1 if (size / GB) >= 10 else 2
+		return f"{size / GB:.{prec}f}GB"
+	elif size >= MB:
+		prec = 1 if (size / MB) >= 10 else 2
+		return f"{size / MB:.{prec}f}MB"
+	elif size >= KB:
+		prec = 1 if (size / KB) >= 10 else 2
+		return f"{size / KB:.{prec}f}KB"
 	else:
-		size_string = f'{size}B'
-	return size_string
+		return f"{int(size)}B"
 	
 def format_status(status, rate):
 
-	TR_STATUS_STOPPED = 0				# paused / Stopped.
-	TR_STATUS_CHECK_WAIT = 1		# queued in the verification queue.
-	TR_STATUS_CHECK = 2					# actively checking/verifying local files.
-	TR_STATUS_DOWNLOAD_WAIT = 3	# queued in the download queue.
-	TR_STATUS_DOWNLOAD = 4			# actively downloading.
-	TR_STATUS_SEED_WAIT = 5			# queued in the seed queue.
-	TR_STATUS_SEED = 6					# finished downloading, actively seeding.
+	#TR_STATUS_STOPPED = 0				# paused / Stopped.
+	#TR_STATUS_CHECK_WAIT = 1			# queued in the verification queue.
+	#TR_STATUS_CHECK = 2					# actively checking/verifying local files.
+	#TR_STATUS_DOWNLOAD_WAIT = 3	# queued in the download queue.
+	#TR_STATUS_DOWNLOAD = 4				# actively downloading.
+	#TR_STATUS_SEED_WAIT = 5			# queued in the seed queue.
+	#TR_STATUS_SEED = 6						# finished downloading, actively seeding.
 	
 	return (
-		'P' if status == TR_STATUS_STOPPED
-		else 'S' if status == TR_STATUS_SEED
-		else 'D' if status == TR_STATUS_DOWNLOAD and rate != 0
+		'P' if status == 0
+		else 'S' if status == 6
+		else 'D' if status == 4 and rate != 0
 		else 'I'
 	)
 	
 def format_rate(rate):
-	if rate > 10000000000:
-		rate_string = f'{rate / 1000000000:.1f}GB/s\u21c2'
-	elif rate > 1000000000:
-		rate_string = f'{rate / 1000000000:.2f}GB/s\u21c2'
-	elif rate > 10000000:
-		rate_string = f'{rate / 1000000:.1f}MB/s\u21c2'
-	elif rate > 1000000:
-		rate_string = f'{rate / 1000000:.2f}MB/s\u21c2'
-	elif rate > 10000:
-		rate_string = f'{rate / 1000:.1f}KB/s\u21c2'
-	elif rate > 1000:
-		rate_string = f'{rate / 1000:.2f}KB/s\u21c2'
+
+	# define binary powers
+	KB = 1024
+	MB = KB * 1024
+	GB = MB * 1024
+	TB = GB * 1024
+
+	if rate >= TB:
+		prec = 1 if (rate / TB) >= 10 else 2
+		return f"{rate/ TB:.{prec}f}TB/s\u21c2"
+	elif rate >= GB:
+		prec = 1 if (rate / GB) >= 10 else 2
+		return f"{rate / GB:.{prec}f}GB/s\u21c2"
+	elif rate >= MB:
+		prec = 1 if (rate / MB) >= 10 else 2
+		return f"{rate / MB:.{prec}f}MB/s\u21c2"
+	elif rate >= KB:
+		prec = 1 if (rate / KB) >= 10 else 2
+		return f"{rate / KB:.{prec}f}KB/s\u21c2"
 	else:
-		rate_string = f'{rate}B/s\u21c2'
-	return rate_string
-	
+		return f"{int(rate)}B/s\u21c2"
+			
 def get_transmission_data(client):
 	
 	torrents = []
