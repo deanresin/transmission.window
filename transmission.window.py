@@ -147,7 +147,8 @@ def get_transmission_data(client):
 		arguments={"fields": ["alt-speed-enabled"]}
 	)
 	
-	alt_active = True if alt_status.get("arguments").get("alt-speed-enabled") else False
+	# empty default dict avoids crash
+	alt_active = bool(alt_status.get("arguments", {}).get("alt-speed-enabled"))
 	
 	return torrents, alt_active
 
