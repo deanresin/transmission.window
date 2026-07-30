@@ -163,26 +163,18 @@ def get_port_status(client):
 
 
 def draw_screen(stdscr, hostport, snapshot_mode=False):
+	
 	# initialize color pairs
 	curses.start_color()
 	curses.use_default_colors()
-
-	# color definitions
-	# 1: header (white text on blue background)
+	# color definitions (id, text, background)
 	curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLUE)
-	# 2: ids & dividers (dark gray / bright black)
 	curses.init_pair(2, curses.COLOR_WHITE, -1)
-	# 3: percent / speed / size (yellow)
 	curses.init_pair(3, curses.COLOR_YELLOW, -1)
-	# 4: alt speed active (blue)
 	curses.init_pair(4, curses.COLOR_BLUE, -1)
-	# 5: alt speed inactive (dark yellow)
-	curses.init_pair(5, curses.COLOR_YELLOW, -1)
-	# 6: in-progress bar (yellow text on blue background)
+	#
 	curses.init_pair(6, curses.COLOR_YELLOW, curses.COLOR_BLUE)
-	# 7: finished 100% bar (white text on green background)
 	curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_GREEN)
-	# 8: port open status
 	curses.init_pair(8, curses.COLOR_GREEN, -1)
 
 	# hide cursor
@@ -195,6 +187,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	stdscr.timeout(50)
 	
 	# executor with max_workers=1 ensures only one check runs at a time
+	# transmission data and port status can't run at the same time but to no ill effect
 	executor = ThreadPoolExecutor(max_workers=1)
 	port_future = None
 	transmission_future = None
@@ -261,11 +254,8 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		header = f" ~~~ TRANSMISSION-WINDOW ~~~ "
 
 		# draw header bar
-		stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
-		stdscr.addstr(1, 1, "                             ")
-		stdscr.addstr(2, 1, header)
-		stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
-    
+		stdscr.addstr(1, 1, "                             ", curses.color_pair(1) | curses.A_BOLD)
+		stdscr.addstr(2, 1, header, curses.color_pair(1) | curses.A_BOLD)
 		stdscr.addstr(2, 30, now_str, curses.color_pair(8) if port_is_open else curses.color_pair(2))
 		
 		alt_color = (curses.color_pair(4) if alt_active else curses.color_pair(3))
