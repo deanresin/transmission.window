@@ -2,13 +2,12 @@
 
 # provides a terminal gui window into the current state of transmission-daemon
 # heading timestamp will be green if port is open (checked every Y seconds)
+# state color or "no torrents" color will be blue if alternate speeds are active
 # transmission-daemon state updated every X seconds
 # does not show upload speed
 
 import curses
 import datetime
-import re
-import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -183,8 +182,9 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	except curses.error:
 		pass
 	
-	# checks for key interrupt every <X>ms
-	stdscr.timeout(50)
+	# instructs stdscr.getch() to wait Xms for key press
+	# timeout happens on every stdscr.getch() call, not here 
+	stdscr.timeout(150)
 	
 	# executor with max_workers=1 ensures only one check runs at a time
 	# transmission data and port status can't run at the same time but to no ill effect
@@ -205,6 +205,10 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	
 	# create persistant transmission rpc connection
 	client = Transmission_RPC_Client(hostport)
+	# get transmission data right away to avoid initial delay
+	# getting port status will immediately be queued 
+	transmission_future = executor.submit(get_transmission_data, client)
+	port_future = executor.submit(get_port_status, client)
     
 	while True:
 	
@@ -231,7 +235,8 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		if transmission_future is None and (current_time - last_transmission_time >= TRANSMISSION_INTERVAL):
 			transmission_future = executor.submit(get_transmission_data, client)
 		
-		# check if there is a port status update 
+		# check if there is a port status update
+		# if excectuor is busy, it will queue this job and run as soon as it is free 
 		if port_future is not None and port_future.done():
 			port_is_open = port_future.result()
 			port_future = None  # clear the future so a new check can spawn
