@@ -277,7 +277,8 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 
 			# calculate remaining space for flexible progress/name bar
 			# 8 extra spaces accounts for padding, brackets, and state column
-			extra = 9 if alt_active else 10
+			#extra = 9 if alt_active else 10
+			extra = 9
 			flex = max_x - (extra + id_width + percent_width + size_width + rate_width)
 			flex = max(10, flex)  # floor width at 10 to avoid crashes on tiny windows
 
