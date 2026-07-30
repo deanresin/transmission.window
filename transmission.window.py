@@ -278,7 +278,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 			id_width = max(len(t["id"]) for t in torrents)
 			percent_width = max(len(str(t["percent"])) for t in torrents)
 			size_width = max(len(t["size"]) for t in torrents)
-			rate_width = 11
+			rate_width = 10
 
 			# calculate remaining space for flexible progress/name bar
 			# 8 extra spaces accounts for padding, brackets, and state column
