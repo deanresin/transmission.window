@@ -12,89 +12,141 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+import requests
+import os
 
-def get_transmission_data(hostport):
+class Transmission_RPC_Client:
 
-	try:
-		# get session info to check alternate speed limit status
-		session = subprocess.check_output(
-			["transmission-remote", hostport, "--authenv", "--session-info"],
-			text=True,
-			stderr=subprocess.DEVNULL,
-		)
-		# True if alternate speed limits are active
-		alt_active = "Download speed limit: 0" not in session
-		
-		# get torrent info
-		info = subprocess.check_output(
-			["transmission-remote", hostport, "--authenv", "-t", "all", "--info"],
-			text=True,
-			stderr=subprocess.DEVNULL,
-		)
-	except (subprocess.CalledProcessError, FileNotFoundError):
-		return None, False
-	
-	# parsing info
-	# get ids
-	ids = re.findall(r"^\s*Id:\s*(\d+)", info, re.MULTILINE)
-	if not ids:
-		return [], alt_active
-
-	names = re.findall(r"^\s*Name:\s*(.*)$", info, re.MULTILINE)
-	perc_raw = re.findall(r"^\s*Percent Done:\s*([\d\.]+)%", info, re.MULTILINE)
-	sizes_raw = re.findall(r"^\s*Total size:\s*([^(]*) \(.*$", info, re.MULTILINE)
-	states_raw = re.findall(r"^\s*State:\s*(.*)$", info, re.MULTILINE)
-	dspeeds_raw = re.findall(r"^\s*Download Speed:\s*(.*)$", info, re.MULTILINE)
-
-	torrents = []
+	def __init__(self, hostport, auth=None):
     
-	# format data
-	for i in range(len(ids)):
-  	
-		try:
-			progress = int(float(perc_raw[i]))
-		except (IndexError, ValueError):
-			progress = 0
-  		
-		# S when Idle with zero downloaded makes no sense
-		state = "I" if "Idle" in states_raw[i] else "S" if "Seeding" in states_raw[i] else ("D" if "Down" in states_raw[i] else "P")
-
-		if "None" in sizes_raw[i]:
-			size = "n/a"
+		self.url = f'http://{hostport}/transmission/rpc'
+		self.session = requests.Session()
+		if auth:
+			self.session.auth = auth
 		else:
-			size = sizes_raw[i].replace(" ", "") 
+			self.session.auth = tuple(os.environ.get('TR_AUTH').split(":", 1))
 
-		# speed string with unicode arrow ⇂
-		speed = dspeeds_raw[i].replace(" ", "") + "\u21c2"
+	def send_rpc(self, method: str, arguments: dict = None) -> dict:
+		payload = {"method": method}
+		if arguments:
+			payload["arguments"] = arguments
 
+		# initial request
+		response = self.session.post(self.url, json=payload)
+
+		# handle 409 CSRF session id requirement
+		if response.status_code == 409:
+			session_id = response.headers.get("X-Transmission-Session-Id")
+			if session_id:
+				# update default session headers so future calls automatically include it
+				self.session.headers.update(
+						{"X-Transmission-Session-Id": session_id}
+				)
+				# retry request with valid session token
+				response = self.session.post(self.url, json=payload)
+
+		response.raise_for_status()
+		return response.json()
+
+def format_size(size):
+	if size > 10000000000:
+		size_string = f'{size / 1000000000:.1f}GB'
+	if size > 1000000000:
+		size_string = f'{size / 1000000000:.2f}GB'
+	elif size > 10000000:
+		size_string = f'{size / 1000000:.1f}MB'
+	elif size > 1000000:
+		size_string = f'{size / 1000000:.2f}MB'
+	elif size > 10000:
+		size_string = f'{size / 1000:.1f}KB'
+	elif size > 1000:
+		size_string = f'{size / 1000:.2f}KB'
+	elif size == 0:
+		size_string = 'n/a'
+	else:
+		size_string = f'{size}B'
+	return size_string
+	
+def format_status(status, rate):
+
+	TR_STATUS_STOPPED = 0				# paused / Stopped.
+	TR_STATUS_CHECK_WAIT = 1		# queued in the verification queue.
+	TR_STATUS_CHECK = 2					# actively checking/verifying local files.
+	TR_STATUS_DOWNLOAD_WAIT = 3	# queued in the download queue.
+	TR_STATUS_DOWNLOAD = 4			# actively downloading.
+	TR_STATUS_SEED_WAIT = 5			# queued in the seed queue.
+	TR_STATUS_SEED = 6					# finished downloading, actively seeding.
+	
+	return (
+		'P' if status == TR_STATUS_STOPPED
+		else 'S' if status == TR_STATUS_SEED
+		else 'D' if status == TR_STATUS_DOWNLOAD and rate != 0
+		else 'I'
+	)
+	
+def format_rate(rate):
+	if rate > 10000000000:
+		rate_string = f'{rate / 1000000000:.1f}GB/s\u21c2'
+	if rate > 1000000000:
+		rate_string = f'{rate / 1000000000:.2f}GB/s\u21c2'
+	elif rate > 10000000:
+		rate_string = f'{rate / 1000000:.1f}MB/s\u21c2'
+	elif rate > 1000000:
+		rate_string = f'{rate / 1000000:.2f}MB/s\u21c2'
+	elif rate > 10000:
+		rate_string = f'{rate / 1000:.1f}KB/s\u21c2'
+	elif rate > 1000:
+		rate_string = f'{rate / 1000:.2f}KB/s\u21c2'
+	else:
+		rate_string = f'{rate}B/s\u21c2'
+	return rate_string
+	
+def get_transmission_data(client):
+	
+	torrents = []
+	
+	torrents_json = client.send_rpc(
+		method="torrent-get",
+		arguments={"fields": ["id", "name", "percentDone", "totalSize", "status", "rateDownload"]},
+	)
+	
+	for torrent in torrents_json.get("arguments", {}).get("torrents", []):
+	
+		id = str(torrent["id"])
+		name = torrent["name"]
+		percent = int(f'{torrent["percentDone"] * 100:.0f}')
+		size = format_size(torrent["totalSize"])
+		rate = format_rate(torrent["rateDownload"])
+		status = format_status(torrent["status"], torrent["rateDownload"])
+		
 		torrents.append(
 			{
-				"id": ids[i],
-				"name": names[i],
-				"progress": progress,
+				"id": id,
+				"name": name,
+				"percent": percent,
 				"size": size,
-				"state": state,
-				"speed": speed,
+				"status": status,
+				"rate": rate,
 			}
 		)
-
+	
+	alt_status = client.send_rpc(
+		method="session-get",
+		arguments={"fields": ["alt-speed-enabled"]}
+	)
+	
+	alt_active = True if alt_status.get("arguments").get("alt-speed-enabled") else False
+	
 	return torrents, alt_active
 
-def get_port_status(hostport):
-	port_open = False
-	try:
-		# test if port is open
-		port_status = subprocess.check_output(
-			["transmission-remote", hostport, "--authenv", "-pt"],
-			text=True,
-			stderr=subprocess.DEVNULL,
-		)
-		# True if alternate speed limits are active
-		port_open = "Port is open: Yes" in port_status
-	except (subprocess.CalledProcessError, FileNotFoundError):
-		pass
+def get_port_status(client):
 
-	return port_open
+	port_status_json = client.send_rpc(
+		method="port-test",
+		arguments={"ip_protocol": "ipv4"}
+	)
+
+	return port_status_json["arguments"].get("port-is-open", False)
 
 
 def draw_screen(stdscr, hostport, snapshot_mode=False):
@@ -144,6 +196,9 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	
 	# redraw screen?
 	update = False
+	
+	# create persistant transmission rpc connection
+	client = Transmission_RPC_Client(hostport)
     
 	while True:
 	
@@ -168,7 +223,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 			
 		# only get transmission update if previous update finished
 		if transmission_future is None and (current_time - last_transmission_time >= TRANSMISSION_INTERVAL):
-			transmission_future = executor.submit(get_transmission_data, hostport)
+			transmission_future = executor.submit(get_transmission_data, client)
 		
 		# check if there is a port status update 
 		if port_future is not None and port_future.done():
@@ -177,7 +232,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 			last_port_time = current_time
 		# only check port if previous update finished
 		if port_future is None and (current_time - last_port_time >= PORT_INTERVAL):
-			port_future = executor.submit(get_port_status, hostport)
+			port_future = executor.submit(get_port_status, client)
 			
 		# no data, no draw
 		if not update:
@@ -200,65 +255,66 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
     
 		stdscr.addstr(2, 30, now_str, curses.color_pair(8) if port_is_open else curses.color_pair(2))
 		
+		alt_color = (curses.color_pair(4) if alt_active else curses.color_pair(3))
+		
 		if not torrents:
-			color = curses.color_pair(3) if alt_active else curses.color_pair(4)
-			stdscr.addstr(4, 2, "no torrents", color | curses.A_BOLD)
+			stdscr.addstr(4, 2, "no torrents", alt_color | curses.A_BOLD)
 			
 		else:
 			# measure column widths
 			id_width = max(len(t["id"]) for t in torrents)
-			prog_width = max(len(str(t["progress"])) for t in torrents)
+			percent_width = max(len(str(t["percent"])) for t in torrents)
 			size_width = max(len(t["size"]) for t in torrents)
-			speed_width = 11
+			rate_width = 11
 
 			# calculate remaining space for flexible progress/name bar
 			# 8 extra spaces accounts for padding, brackets, and state column
-			extra = 10 if alt_active else 9
-			flex = max_x - (extra + id_width + prog_width + size_width + speed_width)
-			flex = max(10, flex)  # Floor width at 10 to avoid crashes on tiny windows
+			extra = 9 if alt_active else 10
+			flex = max_x - (extra + id_width + percent_width + size_width + rate_width)
+			flex = max(10, flex)  # floor width at 10 to avoid crashes on tiny windows
 
-			alt_color = (curses.color_pair(3) if alt_active else curses.color_pair(4))
+			
 
-			for idx, t in enumerate(torrents):
-				row = idx + 4
+			for count, torrent in enumerate(torrents):
+				row = count + 4
 				if row >= max_y - 2:
 					break  # stop drawing if terminal screen is too short
 
 				# render id
-				stdscr.addstr(row, 1, f"{t['id']:>{id_width}} ",)
+				stdscr.addstr(row, 1, f"{torrent['id']:>{id_width}} ",)
 
 				# render percentage
-				stdscr.addstr(row, 2 + id_width, f"{t['progress']:>{prog_width}}% ", curses.color_pair(4) | curses.A_BOLD,)
+				stdscr.addstr(row, 2 + id_width, f"{torrent['percent']:>{percent_width}}% ", curses.color_pair(4) | curses.A_BOLD,)
 
 				# render size
-				stdscr.addstr(row, 4 + id_width + prog_width, f"{t['size']:>{size_width}}", curses.color_pair(3),)
+				stdscr.addstr(row, 4 + id_width + percent_width, f"{torrent['size']:>{size_width}}", curses.color_pair(3),)
 
 				# calculate progress bar fill lengths
-				pb_len = int(t["progress"] * flex / 100)
-				npb_len = flex - pb_len
-				name = t["name"]
+				done_length = int(torrent["percent"] * flex / 100)
+				remaining_length = flex - done_length
+				name = torrent["name"]
 
-				filled_name = name[:pb_len].ljust(pb_len)
-				unfilled_name = name[pb_len : pb_len + npb_len].ljust(npb_len)
+				filled_name = name[:done_length].ljust(done_length)
+				unfilled_name = name[done_length : done_length + remaining_length].ljust(remaining_length)
 
 				# render left bracket
-				stdscr.addstr(row, 4 + id_width + prog_width + size_width, "|",)
+				stdscr.addstr(row, 4 + id_width + percent_width + size_width, "|",)
 
 				# render filled progress bar
-				pb_color = (curses.color_pair(7) if t["progress"] == 100 else curses.color_pair(6))
-				stdscr.addstr(row, 5 + id_width + prog_width + size_width, " " + filled_name, pb_color)
+				done_color = (curses.color_pair(7) if torrent["percent"] == 100 else curses.color_pair(6))
+				stdscr.addstr(row, 5 + id_width + percent_width + size_width, " " + filled_name, done_color)
 
 				# render unfilled progress bar
-				stdscr.addstr(row, 5 + id_width + prog_width + size_width + pb_len, unfilled_name, curses.color_pair(3) | curses.A_BOLD,)
+				stdscr.addstr(row, 5 + id_width + percent_width + size_width + done_length, unfilled_name, curses.color_pair(3) | curses.A_BOLD,)
 
 				# render right bracket
-				stdscr.addstr(row, 6 + id_width + prog_width + size_width + flex, "|",)
+				stdscr.addstr(row, 6 + id_width + percent_width + size_width + flex, "|",)
 
 				# render download speed
-				stdscr.addstr(row, 7 + id_width + prog_width + size_width + flex, f"{t['speed']:>{speed_width}}", curses.color_pair(3),)
+				stdscr.addstr(row, 7 + id_width + percent_width + size_width + flex, f"{torrent['rate']:>{rate_width}}", curses.color_pair(3),)
 
 				# render download state
-				stdscr.addstr(row, 8 + id_width + prog_width + size_width + flex + speed_width, f"{t['state']}", alt_color,)		
+				stdscr.addstr(row, 8 + id_width + percent_width + size_width + flex + rate_width, f"{torrent['status']}", alt_color,)		
 				
 		if not snapshot_mode:
 				
