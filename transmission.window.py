@@ -51,7 +51,7 @@ class Transmission_RPC_Client:
 def format_size(size):
 	if size > 10000000000:
 		size_string = f'{size / 1000000000:.1f}GB'
-	if size > 1000000000:
+	elif size > 1000000000:
 		size_string = f'{size / 1000000000:.2f}GB'
 	elif size > 10000000:
 		size_string = f'{size / 1000000:.1f}MB'
@@ -87,7 +87,7 @@ def format_status(status, rate):
 def format_rate(rate):
 	if rate > 10000000000:
 		rate_string = f'{rate / 1000000000:.1f}GB/s\u21c2'
-	if rate > 1000000000:
+	elif rate > 1000000000:
 		rate_string = f'{rate / 1000000000:.2f}GB/s\u21c2'
 	elif rate > 10000000:
 		rate_string = f'{rate / 1000000:.1f}MB/s\u21c2'
