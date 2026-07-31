@@ -198,7 +198,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	last_port_time = 0
 	
 	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every <X> seconds
-	PORT_INTERVAL = 60.0	# refresh port status every <X> seconds
+	PORT_INTERVAL = 15.0	# refresh port status every <X> seconds
 	
 	# redraw screen?
 	update = False
@@ -326,12 +326,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 				stdscr.addstr(row, 8 + id_width + percent_width + size_width + flex + rate_width, f"{torrent['status']}", alt_color,)		
 				
 		if not snapshot_mode:
-				
-			stdscr.addstr(
-				4 + len(torrents) + (2 if not len(torrents) else 1), 
-				1, 
-				"press 'q' or ctrl-c to quit",
-			)
+			stdscr.addstr(4 + len(torrents) + (2 if not len(torrents) else 1), 1, "press 'q' or ctrl-c to quit",)
 			
 		stdscr.refresh()
 
