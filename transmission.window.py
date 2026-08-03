@@ -5,6 +5,12 @@
 # state color or "no torrents" color will be blue if alternate speeds are active
 # transmission-daemon state updated every X seconds
 # does not show upload speed
+# transmission-daemon authentication in this script relies on the TR_AUTH=username:password environment variable being set
+
+# to display all terminal colors
+# for i in {0..255}; do printf "\x1b[38;5;${i}mcolour%-5i\x1b[0m" $i; if [ $(((i + 1) % 8)) -eq 0 ]; then echo; fi; done
+#print(curses.COLORS)      # Usually 8 or 256
+#print(curses.COLOR_PAIRS) # Often 64, 256, or 32767 depending on ncurses build
 
 import curses
 import datetime
