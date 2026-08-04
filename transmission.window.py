@@ -19,6 +19,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import requests
 import os
+import subprocess
 
 class Transmission_RPC_Client:
 
@@ -166,6 +167,12 @@ def get_port_status(client):
 
 	return port_status_json["arguments"].get("port-is-open", False)
 
+def get_vpnd_timer():
+	
+	cmd = 'systemctl list-timers | grep -E "shutdown\.vpn\.[0-9]{6,}\.timer" | cut -d" " -f5'
+	result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+  		
+	return result.stdout.strip()
 
 def draw_screen(stdscr, hostport, snapshot_mode=False):
 	
@@ -261,6 +268,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 		max_y, max_x = stdscr.getmaxyx()
 
 		# header strings
+		#vpnt_str = systemctl list-timers | grep -E "shutdown\.vpn\.[0-9]{6,}\.timer" | cut -d' ' -f5
 		now_str = " - " + datetime.datetime.now().strftime("%H:%M %a, %b %d, %Y")
 		header = f" ~~~ TRANSMISSION-WINDOW ~~~ "
 
@@ -332,7 +340,7 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 				stdscr.addstr(row, 8 + id_width + percent_width + size_width + flex + rate_width, f"{torrent['status']}", alt_color,)		
 				
 		if not snapshot_mode:
-			stdscr.addstr(4 + len(torrents) + (2 if not len(torrents) else 1), 1, "press 'q' or ctrl-c to quit",)
+			stdscr.addstr(4 + len(torrents) + (2 if not len(torrents) else 1), 1, f"press 'q' to quit\tvpnd: {get_vpnd_timer()}",)
 			
 		stdscr.refresh()
 
