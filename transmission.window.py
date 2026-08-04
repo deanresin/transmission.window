@@ -211,7 +211,8 @@ def draw_screen(stdscr, hostport, snapshot_mode=False):
 	last_port_time = 0
 	
 	TRANSMISSION_INTERVAL = 2.0  # refresh transmission data every <X> seconds
-	PORT_INTERVAL = 15.0	# refresh port status every <X> seconds
+	# will get rate limited if this is too low
+	PORT_INTERVAL = 360.0	# refresh port status every <X> seconds
 	
 	# redraw screen?
 	update = False
